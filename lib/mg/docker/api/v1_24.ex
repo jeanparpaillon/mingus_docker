@@ -4,6 +4,7 @@ defmodule Mg.Docker.Api.V1_24 do
   """
   use Plug.Router
 
+  alias Mg.Docker.Containers
   alias Mg.Docker.Api
 
   require Logger
@@ -12,9 +13,11 @@ defmodule Mg.Docker.Api.V1_24 do
   
   plug :match
   plug :dispatch
+  plug :fetch_query_params
 
   get "/containers/json" do
-    send_resp(conn, 200, Jason.encode!([]))
+    containers = Containers.find(conn.query_params)
+    send_resp(conn, 200, Jason.encode!(containers))
   end
 
   get "/version" do
