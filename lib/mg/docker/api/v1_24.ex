@@ -3,6 +3,7 @@ defmodule Mg.Docker.Api.V1_24 do
   Docker engine API v1.24 implementation
   """
   use Plug.Router
+  use Plug.ErrorHandler
 
   alias Mg.Docker.Containers
   alias Mg.Docker.Api
@@ -25,6 +26,14 @@ defmodule Mg.Docker.Api.V1_24 do
       Api.version(%{"ApiVersion" => @api_vsn})
       |> Jason.encode!()
     send_resp(conn, 200, resp)
+  end
+
+  def handle_errors(conn, %{kind: :error, reason: reason, stack: _stack}) do
+    send_resp(conn, Plug.Exception.status(reason), Exception.message(reason))
+  end
+
+  def handle_errors(conn, %{kind: _kind, reason: _reason, stack: _stack}) do
+    send_resp(conn, 500, "Something went wrong")
   end
   
   def version do

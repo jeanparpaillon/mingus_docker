@@ -14,7 +14,7 @@ defmodule Mg.Docker do
       :mingus_docker
       |> Application.get_env(:listen, [])
       |> Enum.reduce(%__MODULE__{}, &cowboy_spec/2)
-    
+
     {:ok, pid} = Supervisor.start_link(state.children, strategy: :one_for_one)
     {:ok, pid, state}
   end

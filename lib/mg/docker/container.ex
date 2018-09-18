@@ -3,7 +3,7 @@ defmodule Mg.Docker.Container do
   Describe Docker container
   """
 
-  alias Mg.Docker.Port
+  alias Mg.Docker.{Image, Images, Port}
 
   @type id :: String.t
   @type name :: String.t
@@ -58,29 +58,71 @@ defmodule Mg.Docker.Container do
   Build a new container structure from sniffle
   """
   def from_sniffle(data) do
+    config = data |> :ft_vm.config()
+
+    names =
+      config
+      |> Map.get("hostname")
+      |> List.wrap()
+      |> Enum.concat(data |> :ft_vm.alias() |> List.wrap())
+
+    image_id = data |> :ft_vm.dataset()
+    image_name =
+      image_id
+      |> Images.get()
+      |> case do
+           nil ->
+             ""
+
+           image ->
+             image |> Image.tags() |> List.first()
+         end
+    size_root_fs = Map.get(config, "quota", 0) * 1_000_000
+    
     %__MODULE__{
       id: data |> :ft_vm.uuid(),
-      names: data |> :ft_vm.alias() |> List.wrap(),
-      image: data |> :ft_vm.dataset(),
-      image_id: data |> :ft_vm.dataset(),
+      names: names,
+      image_id: image_id,
+      image: image_name,
+      command: "<image>",
       created: data |> :ft_vm.created_at(),
       state: data |> :ft_vm.state(),
-      status: data |> :ft_vm.state()
+      status: data |> :ft_vm.state() |> to_docker_status(),
+      ports: [],     # ???
+      labels: %{},   # ???
+      size_rw: 1,    # ???
+      size_root_fs: size_root_fs
     }
   end
+
+  ###
+  ### Priv
+  ###
+  defp to_docker_status(:failed), do: "failed"
+  defp to_docker_status(_), do: "running"
 end
 
 defimpl Jason.Encoder, for: Mg.Docker.Container do
+  alias Mg.Docker.Utils
+  
+  @to_json [
+    {"Id", :id},
+    {"Names", :names},
+    {"Image", :image},
+    {"ImageID", :image_id},
+    {"Command", :command},
+    {"Created", :created},
+    {"State", :state},
+    {"Status", :status},
+    {"Ports", :ports},
+    {"Labels", :labels},
+    {"SizeRw", :size_rw},
+    {"SizeRootFs", :size_root_fs}
+  ]
+  
   def encode(data, opts) do
-    %{
-      "Id" => data.id,
-      "Names" => data.names,
-      "Image" => data.image,
-      "ImageID" => data.image_id,
-      "Created" => data.created,
-      "state" => data.state,
-      "status" => data.status
-    }
+    data
+    |> Utils.remap_fields(@to_json)
     |> Jason.Encode.map(opts)
   end
 end
